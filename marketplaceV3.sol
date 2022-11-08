@@ -6,10 +6,12 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 
 
 contract MarketplaceV1 is AccessControl, ReentrancyGuard{
+    using SafeERC20 for IERC20;
     using Counters for Counters.Counter;
     Counters.Counter private _items;
     Counters.Counter private _soldItems;
@@ -204,7 +206,6 @@ contract MarketplaceV1 is AccessControl, ReentrancyGuard{
 
 
     /// Sets the percentageBasisPoints rate (in Wei) for this specific contract instance 
-    /// 10000 wei is equivalent to 100%
     /// 1000 wei is equivalent to 10%
     /// 100 wei is equivalent to 1%
     /// 10 wei is equivalent to 0.1%
@@ -212,7 +213,7 @@ contract MarketplaceV1 is AccessControl, ReentrancyGuard{
     /// Whereby a traditional floating point percentage like 8.54% would simply be 854 percentage basis points (or in terms of the ethereum uint256 variable, 854 wei)
     /// _newCost is the annual percentage yield as per the above instructions
     function setPlatformFees(uint256 _newCost) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(_newCost >= 0 && _newCost <= 10000, "Percentage must be a value >=0 and <= 10000");
+        require(_newCost >= 0 && _newCost <= 3000, "Percentage must be a value >=0 and <= 3000");
         platform_fee = _newCost;
         emit SetPercentageFees(_newCost);
     }
@@ -227,8 +228,8 @@ contract MarketplaceV1 is AccessControl, ReentrancyGuard{
         uint256 _duration
     ) external isWhitelisted(nftContract)  MarketPlaceToggle nonReentrant {
         require(price > 0, "Price cannot be 0");
-        require(isFroyo >=0 && isFroyo <= 1, "Only 0 and 1 is accepted!");
-        require(_duration >= 0 , "Cannot be 0 days!"); 
+        require(isFroyo < 2, "Only 0 and 1 is accepted!");
+        require(_duration > 0 , "Cannot be 0 days!"); 
         
         if (IERC721(nftContract).getApproved(tokenId) != address(this)) {
             revert NotApprovedForMarketplace();
@@ -444,8 +445,9 @@ contract MarketplaceV1 is AccessControl, ReentrancyGuard{
         1
         );
         
-        IERC20(froyoContract).transferFrom(msg.sender,owner,((price*platform_fee)/10000));
-        IERC20(froyoContract).transferFrom(msg.sender,seller,(price - ((price*platform_fee)/10000))); 
+
+        IERC20(froyoContract).safeTransferFrom(msg.sender,owner,((price*platform_fee)/10000));
+        IERC20(froyoContract).safeTransferFrom(msg.sender,seller,(price - ((price*platform_fee)/10000))); 
         IERC721(_nftContract).safeTransferFrom(address(this), msg.sender, idToMarketplaceItem[itemId - 1].tokenId);
         idToMarketplaceItem[itemId - 1].owner = payable(msg.sender);
         idToMarketplaceItem[itemId - 1].sold = true;
